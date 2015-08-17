@@ -237,16 +237,18 @@ BEGIN
 	-- so we create some CTEs to help us
 	--  * delta -- a simple CTE that has just -1, 0, and 1
 	--      used to look at cells to the left, right, above, and below
-	--  * neighbour -- a CTE based on empty spaces around every cell,
+	--  * empty_neighbour -- a CTE based on empty spaces around every cell,
 	--      these empty spaces are potential "birth" places for new cells
 	--  * neighbour_count -- a CTE based on neighbour,
 	--      we count how many cells surround each empty space,
+	--      Note: This neighbour_count differs from the next query
+	--      as we are counting neighbours around cells, not spaces
 	WITH delta (num) AS (
 		          SELECT CAST(-1 AS SMALLINT) AS num
 		UNION ALL SELECT CAST( 0 AS SMALLINT) AS num
 		UNION ALL SELECT CAST( 1 AS SMALLINT) AS num
 	)
-	,	neighbour (x, y) AS (
+	,	empty_neighbour (x, y) AS (
 		SELECT DISTINCT
 			dbo.cell.x + delta_x.num AS x
 		,	dbo.cell.y + delta_y.num AS y
@@ -266,21 +268,21 @@ BEGIN
 	)
 	,	neighbour_count (x, y, neighbour_count) AS (
 		SELECT
-			neighbour.x
-		,	neighbour.y
+			empty_neighbour.x
+		,	empty_neighbour.y
 			-- This expression is here to eliminate the silly NULL agregation warning
 			-- Otherwise, we could just COUNT(other_cell.gen)
 		,	COALESCE(SUM(CASE WHEN other_cell.gen IS NOT NULL THEN 1 ELSE 0 END), 0) AS neighbour_count
 		FROM
-			neighbour
+			empty_neighbour
 			CROSS JOIN delta AS delta_x
 			CROSS JOIN delta AS delta_y
 			LEFT JOIN dbo.cell AS other_cell
-			ON	other_cell.x = neighbour.x + delta_x.num
-			AND	other_cell.y = neighbour.y + delta_y.num
+			ON	other_cell.x = empty_neighbour.x + delta_x.num
+			AND	other_cell.y = empty_neighbour.y + delta_y.num
 		GROUP BY
-			neighbour.x
-		,	neighbour.y
+			empty_neighbour.x
+		,	empty_neighbour.y
 	)
 	INSERT INTO dbo.cell (x, y, gen)
 	SELECT
@@ -304,6 +306,8 @@ BEGIN
 	--      used to look at cells to the left, right, above, and below
 	--  * neighbour_count -- a CTE based on cell,
 	--      we count how many neihbours surround each cell,
+	--      Note: This neighbour_count differs from the previous query
+	--      as we are counting neighbours around cells, not spaces
 	WITH delta (num) AS (
 		          SELECT CAST(-1 AS SMALLINT) AS num
 		UNION ALL SELECT CAST( 0 AS SMALLINT) AS num
