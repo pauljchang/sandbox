@@ -1,8 +1,10 @@
 -- pocketcube.sql
+-- Generate all possible transformations
+-- for a 2x2x2 Rubik's Pocket Cube
 
--- Each cube state is represented as 8 numeric values
+-- Each cubie state is represented as 8 numeric values
 -- which correspond to 8 cubes and their orientation
--- The positional layout is as follows
+-- The positional layout is as follows, where each
 -- 
 -- (top half)
 -- +-+-+
@@ -327,7 +329,7 @@ BEGIN
 	-- y-axis rotation, like U and -D
 	ELSE IF @move = 'y+' SELECT @d1 = @c3, @d2 = @c1, @d3 = @c4, @d4 = @c2, @d5 = @c6, @d6 = @c8, @d7 = @c5, @d8 = @c7;
 	ELSE IF @move = 'y-' SELECT @d1 = @c2, @d2 = @c4, @d3 = @c1, @d4 = @c3, @d5 = @c7, @d6 = @c5, @d7 = @c8, @d8 = @c6;
-	ELSE IF @move = 'y=' SELECT @d2 = @c6 + 0, @d4 = @c8 + 0, @d6 = @c2 + 0, @d8 = @c4 + 0, @d1 = @c5 + 0, @d3 = @c7 + 0, @d5 = @c1 + 0, @d7 = @c3 + 0;
+	ELSE IF @move = 'y=' SELECT @d1 = @c4, @d2 = @c3, @d3 = @c2, @d4 = @c1, @d5 = @c8, @d6 = @c7, @d7 = @c6, @d8 = @c5;
 	-- z-axis rotation, like F and -B
 	ELSE IF @move = 'z+' SELECT @d3 = @c5 + 2, @d4 = @c3 + 1, @d5 = @c6 + 1, @d6 = @c4 + 2, @d1 = @c7 + 1, @d2 = @c1 + 2, @d7 = @c8 + 2, @d8 = @c2 + 1;
 	ELSE IF @move = 'z-' SELECT @d3 = @c4 + 2, @d4 = @c6 + 1, @d5 = @c3 + 1, @d6 = @c5 + 2, @d1 = @c2 + 1, @d2 = @c8 + 2, @d7 = @c1 + 2, @d8 = @c7 + 1;
@@ -380,26 +382,14 @@ BEGIN
 	CREATE        INDEX X_cubetransformation_solve_id     ON dbo.cubetransformation (solve_id);
 END;
 GO
-
--- Seed very first row
-IF	NOT EXISTS (
-		SELECT *
-		FROM
-			dbo.cubetransformation
-		WHERE
-			dbo.cubetransformation.cube_layout = 1020304050607080
-	)
-BEGIN
-	INSERT INTO dbo.cubetransformation (cube_layout, step_count, solve_id, solvemove)
-	VALUES (1020304050607080, 0, NULL, NULL);
-END;
-GO
+-- DROP TABLE dbo.cubetransformation;
 
 -- Static table for solve moves and their inverses
-IF	OBJECT_ID('cubetransformationmove') ISNULL
+IF	OBJECT_ID('cubetransformationmove') IS NULL
 BEGIN
 	CREATE TABLE dbo.cubetransformationmove (
-		transformationmove CHAR(2) NOT NULL PRIMARY KEY
+		id                 INT     NOT NULL IDENTITY(1, 1) -- For sorting
+	,	transformationmove CHAR(2) NOT NULL PRIMARY KEY
 	,	inversemove        CHAR(2) NOT NULL
 	);
 END;
@@ -409,13 +399,36 @@ IF	NOT EXISTS (
 			dbo.cubetransformationmove
 	)
 BEGIN
+	WITH mini_turn (id, mini_turn) AS (
+		          SELECT 1, 'U'
+		UNION ALL SELECT 2, 'D'
+		UNION ALL SELECT 3, 'F'
+		UNION ALL SELECT 4, 'B'
+		UNION ALL SELECT 5, 'L'
+		UNION ALL SELECT 6, 'R'
+		UNION ALL SELECT 7, 'x'
+		UNION ALL SELECT 8, 'y'
+		UNION ALL SELECT 9, 'z'
+	)
+	,	mini_move (id, mini_move, inverse_mini_move) AS (
+		          SELECT 1, '+', '-'
+		UNION ALL SELECT 2, '-', '+'
+		UNION ALL SELECT 3, '=', '='
+	)
 	INSERT INTO cubetransformationmove (transformationmove, inversemove)
-	VALUES
-		('U+', 'U-')
-	,	('U-', 'U+')
-	,	('U=', 'U=')
+	SELECT
+		mini_turn.mini_turn + mini_move.mini_move         AS transformationmove
+	,	mini_turn.mini_turn + mini_move.inverse_mini_move AS inversemove
+	FROM
+		mini_turn
+		CROSS JOIN mini_move
+	ORDER BY
+		mini_turn.id
+	,	mini_move.id
 	;
 END;
+GO
+-- DROP TABLE dbo.cubetransformationmove;
 
 -- Set up counter
 IF	OBJECT_ID('cubetransformationcounter') IS NULL
@@ -438,28 +451,104 @@ BEGIN
 	;
 END;
 GO
+-- DROP TABLE dbo.cubetransformationcounter
+
+-- Seed very first row
+IF	NOT EXISTS (
+		SELECT *
+		FROM
+			dbo.cubetransformation
+		WHERE
+			dbo.cubetransformation.cube_layout = 1020304050607080
+	)
+BEGIN
+	INSERT INTO dbo.cubetransformation (cube_layout, step_count, solve_id, solvemove)
+	VALUES (1020304050607080, 0, NULL, NULL);
+END;
+GO
 
 -- Step through
 DECLARE
-	@cc INT    -- last cube counter
-,	@c  BIGINT -- cube layout
-,	@id INT    -- PK of current row
+	@i          INT = 0       -- for iterations
+,	@maxi       INT = 1000000 -- how many iterations do we want?
+,	@cc         INT           -- last cube counter
+,	@c          BIGINT        -- cube layout
+,	@step_count INT           -- number of steps from solution
+,	@id         INT           -- PK of current row
 ;
-SELECT
-	@id = dbo.cubetransformationcounter
-FROM
-	dbo.cubetransformationcounter
-;
-SET	@id += 1;
-SET	@c = NULL;
-SELECT
-	@c = cubetransformation.cube_layout
-FROM
-	cubetransformation
-WHERE
-	cubetransformation.id = @id
-;
-IF	@c 
+WHILE
+	@i < @maxi
+BEGIN
+	SET	@i += 1;
+	PRINT '# Iteration @i = ' + ISNULL(RTRIM(@i), 'NULL');
+	SELECT
+		@id = dbo.cubetransformationcounter.last_id
+	FROM
+		dbo.cubetransformationcounter
+	;
+	SET	@c          = NULL;
+	SET	@step_count = NULL;
+	SELECT TOP 1
+		@id         = dbo.cubetransformation.id
+	,	@c          = dbo.cubetransformation.cube_layout
+	,	@step_count = dbo.cubetransformation.step_count
+	FROM
+		dbo.cubetransformation
+	WHERE
+		dbo.cubetransformation.id > @id
+	ORDER BY
+		dbo.cubetransformation.id
+	;
+	PRINT '# Processing @id = ' + ISNULL(RTRIM(@id), 'NULL') + ', @c = ' + ISNULL(RTRIM(@c), 'NULL') + ', @step_count = ' + ISNULL(RTRIM(@step_count), 'NULL');
+	IF	@c IS NOT NULL
+	BEGIN
+		WITH transformations (id, cube_layout, transformationmove, inversemove) AS (
+			SELECT
+				dbo.cubetransformationmove.id
+			,	dbo.transform_cube(@c, dbo.cubetransformationmove.transformationmove)
+			,	dbo.cubetransformationmove.transformationmove
+			,	dbo.cubetransformationmove.inversemove
+			FROM
+				dbo.cubetransformationmove
+		)
+		INSERT INTO dbo.cubetransformation (
+			cube_layout
+		,	solve_id
+		,	solvemove
+		,	step_count
+		)
+		-- We do not need distinct layouts
+		-- as no two transformations are identical
+		SELECT
+			transformations.cube_layout
+		,	@id                         AS solve_id
+		,	transformations.inversemove AS solvemove
+		,	@step_count + 1             AS step_count
+		FROM
+			transformations
+		WHERE
+			NOT EXISTS (
+					SELECT *
+					FROM
+						dbo.cubetransformation AS other_transformations
+					WHERE
+						other_transformations.cube_layout = transformations.cube_layout
+			)
+		ORDER BY
+			transformations.id
+		;
+		UPDATE
+		dbo.cubetransformationcounter
+		SET
+			dbo.cubetransformationcounter.last_id = @id
+		FROM
+			dbo.cubetransformationcounter
+		;
+	END;
+END;
+GO
+-- SELECT * FROM dbo.cubetransformationcounter;
+-- SELECT * FROM dbo.cubetransformation;
 
 /*
 EXEC print_cube @cube_layout = 1020304050607080;
@@ -490,4 +579,13 @@ DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'y='); EXEC print_cub
 DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'z+'); EXEC print_cube @cube_layout = @foo;
 DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'z-'); EXEC print_cube @cube_layout = @foo;
 DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'z='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'U='), 'U+'), 'U-'), 'U='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'D='), 'D+'), 'D-'), 'D='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'F='), 'F+'), 'F-'), 'F='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'B='), 'B+'), 'B-'), 'B='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'L='), 'L+'), 'L-'), 'L='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'R='), 'R+'), 'R-'), 'R='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'x='), 'x+'), 'x-'), 'x='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'y='), 'y+'), 'y-'), 'y='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'z='), 'z+'), 'z-'), 'z='); EXEC print_cube @cube_layout = @foo;
 */
