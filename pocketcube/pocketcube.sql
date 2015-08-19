@@ -48,7 +48,7 @@
 -- We concatenate three letters together for the cubie three faces
 -- Top, right, left faces (going clockwise)
 IF	OBJECT_ID('cubeface') IS NULL
-  BEGIN
+BEGIN
 	CREATE TABLE dbo.cubeface (
 		cubenum TINYINT NOT NULL PRIMARY KEY CLUSTERED
 	,	faces   CHAR(3) NOT NULL
@@ -73,7 +73,7 @@ IF	OBJECT_ID('cubeface') IS NULL
 	INSERT INTO cubeface (cubenum, faces)
 	SELECT cubenum + 2, SUBSTRING(faces, 2, 1) + SUBSTRING(faces, 3, 1) + SUBSTRING(faces, 1, 1)
 	FROM cubeface where cubenum % 10 = 0;
-  END;
+END;
 GO
 -- DROP TABLE cubeface;
 
@@ -90,7 +90,7 @@ GO
 --       21 22
 --       23 24
 IF	OBJECT_ID('stickerface') IS NULL
-  BEGIN
+BEGIN
 	CREATE TABLE dbo.stickerface (
 		stickerpos TINYINT NOT NULL -- 1 through 24, corresponding to 24 sticker faces
 	,	cubepos    TINYINT NOT NULL -- cube positions 1 through 8
@@ -130,14 +130,14 @@ IF	OBJECT_ID('stickerface') IS NULL
 	,	(24, 2, 1) -- rear, upper-left
 	;
 	CREATE UNIQUE CLUSTERED INDEX PK_stickerface ON stickerface (stickerpos);
-  END;
+END;
 GO
 -- DROP TABLE stickerface;
 
 IF	OBJECT_ID('print_cube') IS NULL
-  BEGIN
+BEGIN
 	EXEC('CREATE PROCEDURE dbo.print_cube AS SELECT 0;');
-  END;
+END;
 GO
 
 ALTER PROCEDURE dbo.print_cube (@cube_layout BIGINT)
@@ -233,9 +233,9 @@ GO
 -- DROP PROCEDURE print_cube;
 
 IF	OBJECT_ID('transform_cube') IS NULL
-  BEGIN
+BEGIN
 	EXEC('CREATE FUNCTION dbo.transform_cube () RETURNS BIGINT AS BEGIN RETURN 0; END;');
-  END;
+END;
 GO
 
 -- Given a cube layout, transform into a new layout given a move
@@ -275,6 +275,18 @@ BEGIN
 	,	@c7 TINYINT = (@cube_layout /             100) % 100
 	,	@c8 TINYINT = (@cube_layout                  ) % 100
 	;
+
+	-- New positions initially based on old ones
+	DECLARE
+		@d1 TINYINT = @c1
+	,	@d2 TINYINT = @c2
+	,	@d3 TINYINT = @c3
+	,	@d4 TINYINT = @c4
+	,	@d5 TINYINT = @c5
+	,	@d6 TINYINT = @c6
+	,	@d7 TINYINT = @c7
+	,	@d8 TINYINT = @c8
+	;
 	
 	-- Depending on the type of move, reposition cubies
 	-- along with reorientation, if needed
@@ -284,78 +296,198 @@ BEGIN
 
 	-- Single face turns
 	-- Up face
-	     IF @move = 'U+' SELECT @c1 = @c3, @c2 = @c1, @c3 = @c4, @c4 = @c2;
-	ELSE IF @move = 'U-' SELECT @c1 = @c2, @c2 = @c4, @c3 = @c1, @c4 = @c3;
-	ELSE IF @move = 'U=' SELECT @c1 = @c4, @c2 = @c3, @c3 = @c2, @c4 = @c1;
+	     IF @move = 'U+' SELECT @d1 = @c3, @d2 = @c1, @d3 = @c4, @d4 = @c2;
+	ELSE IF @move = 'U-' SELECT @d1 = @c2, @d2 = @c4, @d3 = @c1, @d4 = @c3;
+	ELSE IF @move = 'U=' SELECT @d1 = @c4, @d2 = @c3, @d3 = @c2, @d4 = @c1;
 	-- Down face
-	ELSE IF	@move = 'D+' SELECT @c5 = @c7, @c6 = @c5, @c7 = @c8, @c8 = @c6;
-	ELSE IF	@move = 'D-' SELECT @c5 = @c6, @c6 = @c8, @c7 = @c5, @c8 = @c7;
-	ELSE IF	@move = 'D=' SELECT @c5 = @c8, @c6 = @c7, @c7 = @c6, @c8 = @c5;
+	ELSE IF	@move = 'D+' SELECT @d5 = @c7, @d6 = @c5, @d7 = @c8, @d8 = @c6;
+	ELSE IF	@move = 'D-' SELECT @d5 = @c6, @d6 = @c8, @d7 = @c5, @d8 = @c7;
+	ELSE IF	@move = 'D=' SELECT @d5 = @c8, @d6 = @c7, @d7 = @c6, @d8 = @c5;
 	-- Front face
-	ELSE IF	@move = 'F+' SELECT @c3 = @c5 + 2, @c4 = @c3 + 1, @c5 = @c6 + 1, @c6 = @c4 + 2;
-	ELSE IF	@move = 'F-' SELECT @c3 = @c4 + 2, @c4 = @c6 + 1, @c5 = @c3 + 1, @c6 = @c5 + 2;
-	ELSE IF	@move = 'F=' SELECT @c3 = @c6 + 0, @c4 = @c5 + 0, @c5 = @c4 + 0, @c6 = @c3 + 0;
+	ELSE IF	@move = 'F+' SELECT @d3 = @c5 + 2, @d4 = @c3 + 1, @d5 = @c6 + 1, @d6 = @c4 + 2;
+	ELSE IF	@move = 'F-' SELECT @d3 = @c4 + 2, @d4 = @c6 + 1, @d5 = @c3 + 1, @d6 = @c5 + 2;
+	ELSE IF	@move = 'F=' SELECT @d3 = @c6 + 0, @d4 = @c5 + 0, @d5 = @c4 + 0, @d6 = @c3 + 0;
 	-- Back face
-	ELSE IF	@move = 'B+' SELECT @c1 = @c2 + 1, @c2 = @c8 + 2, @c7 = @c1 + 2, @c8 = @c7 + 1;
-	ELSE IF	@move = 'B-' SELECT @c1 = @c7 + 1, @c2 = @c1 + 2, @c7 = @c8 + 2, @c8 = @c2 + 1;
-	ELSE IF	@move = 'B=' SELECT @c1 = @c8 + 0, @c2 = @c7 + 0, @c7 = @c2 + 0, @c8 = @c1 + 0;
+	ELSE IF	@move = 'B+' SELECT @d1 = @c2 + 1, @d2 = @c8 + 2, @d7 = @c1 + 2, @d8 = @c7 + 1;
+	ELSE IF	@move = 'B-' SELECT @d1 = @c7 + 1, @d2 = @c1 + 2, @d7 = @c8 + 2, @d8 = @c2 + 1;
+	ELSE IF	@move = 'B=' SELECT @d1 = @c8 + 0, @d2 = @c7 + 0, @d7 = @c2 + 0, @d8 = @c1 + 0;
 	-- Left face
-	ELSE IF @move = 'L+' SELECT @c1 = @c7 + 2, @c3 = @c1 + 1, @c5 = @c3 + 2, @c7 = @c5 + 1;
-	ELSE IF @move = 'L-' SELECT @c1 = @c3 + 2, @c3 = @c5 + 1, @c5 = @c7 + 2, @c7 = @c1 + 1;
-	ELSE IF @move = 'L=' SELECT @c1 = @c5 + 0, @c3 = @c7 + 0, @c5 = @c1 + 0, @c7 = @c3 + 0;
+	ELSE IF @move = 'L+' SELECT @d1 = @c7 + 2, @d3 = @c1 + 1, @d5 = @c3 + 2, @d7 = @c5 + 1;
+	ELSE IF @move = 'L-' SELECT @d1 = @c3 + 2, @d3 = @c5 + 1, @d5 = @c7 + 2, @d7 = @c1 + 1;
+	ELSE IF @move = 'L=' SELECT @d1 = @c5 + 0, @d3 = @c7 + 0, @d5 = @c1 + 0, @d7 = @c3 + 0;
 	-- Right face
-	ELSE IF @move = 'R+' SELECT @c2 = @c4 + 1, @c4 = @c6 + 2, @c6 = @c8 + 1, @c8 = @c2 + 2;
-	ELSE IF @move = 'R-' SELECT @c2 = @c8 + 1, @c4 = @c2 + 2, @c6 = @c4 + 1, @c8 = @c6 + 2;
-	ELSE IF @move = 'R=' SELECT @c2 = @c6 + 0, @c4 = @c8 + 0, @c6 = @c2 + 0, @c8 = @c4 + 0;
+	ELSE IF @move = 'R+' SELECT @d2 = @c4 + 1, @d4 = @c6 + 2, @d6 = @c8 + 1, @d8 = @c2 + 2;
+	ELSE IF @move = 'R-' SELECT @d2 = @c8 + 1, @d4 = @c2 + 2, @d6 = @c4 + 1, @d8 = @c6 + 2;
+	ELSE IF @move = 'R=' SELECT @d2 = @c6 + 0, @d4 = @c8 + 0, @d6 = @c2 + 0, @d8 = @c4 + 0;
 	-- Whole cube rotations (no slicing)
 	-- x-axis rotation, like R and -L
-	ELSE IF @move = 'x+' SELECT @c2 = @c4 + 1, @c4 = @c6 + 2, @c6 = @c8 + 1, @c8 = @c2 + 2, @c1 = @c3 + 2, @c3 = @c5 + 1, @c5 = @c7 + 2, @c7 = @c1 + 1;
-	ELSE IF @move = 'x-' SELECT @c2 = @c8 + 1, @c4 = @c2 + 2, @c6 = @c4 + 1, @c8 = @c6 + 2, @c1 = @c7 + 2, @c3 = @c1 + 1, @c5 = @c3 + 2, @c7 = @c5 + 1;
-	ELSE IF @move = 'x=' SELECT @c2 = @c6 + 0, @c4 = @c8 + 0, @c6 = @c2 + 0, @c8 = @c4 + 0, @c1 = @c5 + 0, @c3 = @c7 + 0, @c5 = @c1 + 0, @c7 = @c3 + 0;
+	ELSE IF @move = 'x+' SELECT @d2 = @c4 + 1, @d4 = @c6 + 2, @d6 = @c8 + 1, @d8 = @c2 + 2, @d1 = @c3 + 2, @d3 = @c5 + 1, @d5 = @c7 + 2, @d7 = @c1 + 1;
+	ELSE IF @move = 'x-' SELECT @d2 = @c8 + 1, @d4 = @c2 + 2, @d6 = @c4 + 1, @d8 = @c6 + 2, @d1 = @c7 + 2, @d3 = @c1 + 1, @d5 = @c3 + 2, @d7 = @c5 + 1;
+	ELSE IF @move = 'x=' SELECT @d2 = @c6 + 0, @d4 = @c8 + 0, @d6 = @c2 + 0, @d8 = @c4 + 0, @d1 = @c5 + 0, @d3 = @c7 + 0, @d5 = @c1 + 0, @d7 = @c3 + 0;
 	-- y-axis rotation, like U and -D
-	ELSE IF @move = 'y+' SELECT @c1 = @c3, @c2 = @c1, @c3 = @c4, @c4 = @c2, @c5 = @c6, @c6 = @c8, @c7 = @c5, @c8 = @c7;
-	ELSE IF @move = 'y-' SELECT @c1 = @c2, @c2 = @c4, @c3 = @c1, @c4 = @c3, @c5 = @c7, @c6 = @c5, @c7 = @c8, @c8 = @c6;
-	ELSE IF @move = 'y=' SELECT @c2 = @c6 + 0, @c4 = @c8 + 0, @c6 = @c2 + 0, @c8 = @c4 + 0, @c1 = @c5 + 0, @c3 = @c7 + 0, @c5 = @c1 + 0, @c7 = @c3 + 0;
+	ELSE IF @move = 'y+' SELECT @d1 = @c3, @d2 = @c1, @d3 = @c4, @d4 = @c2, @d5 = @c6, @d6 = @c8, @d7 = @c5, @d8 = @c7;
+	ELSE IF @move = 'y-' SELECT @d1 = @c2, @d2 = @c4, @d3 = @c1, @d4 = @c3, @d5 = @c7, @d6 = @c5, @d7 = @c8, @d8 = @c6;
+	ELSE IF @move = 'y=' SELECT @d2 = @c6 + 0, @d4 = @c8 + 0, @d6 = @c2 + 0, @d8 = @c4 + 0, @d1 = @c5 + 0, @d3 = @c7 + 0, @d5 = @c1 + 0, @d7 = @c3 + 0;
 	-- z-axis rotation, like F and -B
-	ELSE IF @move = 'z+' SELECT @c3 = @c5 + 2, @c4 = @c3 + 1, @c5 = @c6 + 1, @c6 = @c4 + 2, @c1 = @c7 + 1, @c2 = @c1 + 2, @c7 = @c8 + 2, @c8 = @c2 + 1;
-	ELSE IF @move = 'z-' SELECT @c1 = @c2 + 1, @c2 = @c8 + 2, @c7 = @c1 + 2, @c8 = @c7 + 1, @c1 = @c2 + 1, @c2 = @c8 + 2, @c7 = @c1 + 2, @c8 = @c7 + 1;
-	ELSE IF @move = 'z=' SELECT @c3 = @c6 + 0, @c4 = @c5 + 0, @c5 = @c4 + 0, @c6 = @c3 + 0, @c1 = @c8 + 0, @c2 = @c7 + 0, @c7 = @c2 + 0, @c8 = @c1 + 0;
+	ELSE IF @move = 'z+' SELECT @d3 = @c5 + 2, @d4 = @c3 + 1, @d5 = @c6 + 1, @d6 = @c4 + 2, @d1 = @c7 + 1, @d2 = @c1 + 2, @d7 = @c8 + 2, @d8 = @c2 + 1;
+	ELSE IF @move = 'z-' SELECT @d3 = @c4 + 2, @d4 = @c6 + 1, @d5 = @c3 + 1, @d6 = @c5 + 2, @d1 = @c2 + 1, @d2 = @c8 + 2, @d7 = @c1 + 2, @d8 = @c7 + 1;
+	ELSE IF @move = 'z=' SELECT @d3 = @c6 + 0, @d4 = @c5 + 0, @d5 = @c4 + 0, @d6 = @c3 + 0, @d1 = @c8 + 0, @d2 = @c7 + 0, @d7 = @c2 + 0, @d8 = @c1 + 0;
 	-- Otherwise, signal an error
 	-- We can't actually throw an error in a UDF
-	ELSE                 SELECT @c1 = 0, @c2 = 0, @c3 = 0, @c4 = 0, @c5 = 0, @c6 = 0, @c7 = 0, @c8 = 0;
+	ELSE                 SELECT @d1 = 0, @d2 = 0, @d3 = 0, @d4 = 0, @d5 = 0, @d6 = 0, @d7 = 0, @d8 = 0;
 
 	-- Normalise rotations
 	-- All rotations are clockwise
 	-- An anti-clockwise rotation is really two clockwise ones
 	-- So all rotations are clockwise, and we can modulo 3
 	SELECT
-		@c1 = (@c1 / 10) * 10 + ((@c1 % 10) % 3)
-	,	@c2 = (@c2 / 10) * 10 + ((@c2 % 10) % 3)
-	,	@c3 = (@c3 / 10) * 10 + ((@c3 % 10) % 3)
-	,	@c4 = (@c4 / 10) * 10 + ((@c4 % 10) % 3)
-	,	@c5 = (@c5 / 10) * 10 + ((@c5 % 10) % 3)
-	,	@c6 = (@c6 / 10) * 10 + ((@c6 % 10) % 3)
-	,	@c7 = (@c7 / 10) * 10 + ((@c7 % 10) % 3)
-	,	@c8 = (@c8 / 10) * 10 + ((@c8 % 10) % 3)
+		@d1 = (@d1 / 10) * 10 + ((@d1 % 10) % 3)
+	,	@d2 = (@d2 / 10) * 10 + ((@d2 % 10) % 3)
+	,	@d3 = (@d3 / 10) * 10 + ((@d3 % 10) % 3)
+	,	@d4 = (@d4 / 10) * 10 + ((@d4 % 10) % 3)
+	,	@d5 = (@d5 / 10) * 10 + ((@d5 % 10) % 3)
+	,	@d6 = (@d6 / 10) * 10 + ((@d6 % 10) % 3)
+	,	@d7 = (@d7 / 10) * 10 + ((@d7 % 10) % 3)
+	,	@d8 = (@d8 / 10) * 10 + ((@d8 % 10) % 3)
 	;
 
 	-- Return new layout
 	SET	@new_layout =
-			@c1 * 100000000000000
-		+	@c2 *   1000000000000
-		+	@c3 *     10000000000
-		+	@c4 *       100000000
-		+	@c5 *         1000000
-		+	@c6 *           10000
-		+	@c7 *             100
-		+	@c8
-	;
+			CAST(@d1 AS BIGINT) * 100000000000000
+		+	CAST(@d2 AS BIGINT) *   1000000000000
+		+	CAST(@d3 AS BIGINT) *     10000000000
+		+	CAST(@d4 AS BIGINT) *       100000000
+		+	CAST(@d5 AS BIGINT) *         1000000
+		+	CAST(@d6 AS BIGINT) *           10000
+		+	CAST(@d7 AS BIGINT) *             100
+		+	CAST(@d8 AS BIGINT)
 	RETURN @new_layout;
 END;
 GO
+-- DROP function dbo.transform_cube;
+
+-- Table to hold all possible pocket cube transformations
+IF	OBJECT_ID('cubetransformation') IS NULL
+BEGIN
+	CREATE TABLE dbo.cubetransformation (
+		id          INT     NOT NULL IDENTITY(1, 1) PRIMARY KEY CLUSTERED
+	,	cube_layout BIGINT  NOT NULL -- cube position encoded as decimal value
+	,	step_count  INT     NOT NULL -- number of steps away from a complete solution
+	,	solve_id    INT     NULL -- ref to self pointing toward solution
+	,	solvemove   CHAR(2) NULL -- move to make toward solution
+	);
+	CREATE UNIQUE INDEX UX_cubetransformation_cube_layout ON dbo.cubetransformation (cube_layout);
+	CREATE        INDEX X_cubetransformation_solve_id     ON dbo.cubetransformation (solve_id);
+END;
+GO
+
+-- Seed very first row
+IF	NOT EXISTS (
+		SELECT *
+		FROM
+			dbo.cubetransformation
+		WHERE
+			dbo.cubetransformation.cube_layout = 1020304050607080
+	)
+BEGIN
+	INSERT INTO dbo.cubetransformation (cube_layout, step_count, solve_id, solvemove)
+	VALUES (1020304050607080, 0, NULL, NULL);
+END;
+GO
+
+-- Static table for solve moves and their inverses
+IF	OBJECT_ID('cubetransformationmove') ISNULL
+BEGIN
+	CREATE TABLE dbo.cubetransformationmove (
+		transformationmove CHAR(2) NOT NULL PRIMARY KEY
+	,	inversemove        CHAR(2) NOT NULL
+	);
+END;
+IF	NOT EXISTS (
+		SELECT *
+		FROM
+			dbo.cubetransformationmove
+	)
+BEGIN
+	INSERT INTO cubetransformationmove (transformationmove, inversemove)
+	VALUES
+		('U+', 'U-')
+	,	('U-', 'U+')
+	,	('U=', 'U=')
+	;
+END;
+
+-- Set up counter
+IF	OBJECT_ID('cubetransformationcounter') IS NULL
+BEGIN
+	CREATE TABLE dbo.cubetransformationcounter (
+		last_id INT NULL
+	);
+END;
+IF	NOT EXISTS (
+	SELECT *
+	FROM
+		dbo.cubetransformationcounter
+	)
+BEGIN
+	INSERT INTO dbo.cubetransformationcounter (last_id)
+	SELECT
+		MAX(cubetransformation.id) - 1
+	FROM
+		cubetransformation
+	;
+END;
+GO
+
+-- Step through
+DECLARE
+	@cc INT    -- last cube counter
+,	@c  BIGINT -- cube layout
+,	@id INT    -- PK of current row
+;
+SELECT
+	@id = dbo.cubetransformationcounter
+FROM
+	dbo.cubetransformationcounter
+;
+SET	@id += 1;
+SET	@c = NULL;
+SELECT
+	@c = cubetransformation.cube_layout
+FROM
+	cubetransformation
+WHERE
+	cubetransformation.id = @id
+;
+IF	@c 
 
 /*
 EXEC print_cube @cube_layout = 1020304050607080;
-DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U+');
-
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U+'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U-'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'D+'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'D-'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'F+'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'F-'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'F='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'B+'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'B-'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'B='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'L+'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'L-'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'L='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'R+'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'R-'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'R='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'x+'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'x-'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'x='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'y+'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'y-'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'y='); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'z+'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'z-'); EXEC print_cube @cube_layout = @foo;
+DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'z='); EXEC print_cube @cube_layout = @foo;
 */
