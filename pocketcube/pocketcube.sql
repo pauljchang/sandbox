@@ -49,14 +49,14 @@
 -- Faces are one of six colours (W)hite, (R)ed, (B)lue, (O)range, (Y)ellow, (G)reen
 -- We concatenate three letters together for the cubie three faces
 -- Top, right, left faces (going clockwise)
-IF	OBJECT_ID('cubeface') IS NULL
+IF	OBJECT_ID('cubie_face') IS NULL
 BEGIN
-	CREATE TABLE dbo.cubeface (
+	CREATE TABLE dbo.cubie_face (
 		cubenum TINYINT NOT NULL PRIMARY KEY CLUSTERED
 	,	faces   CHAR(3) NOT NULL
 	)
 	-- How cubies look with no orientation
-	INSERT INTO cubeface (cubenum, faces)
+	INSERT INTO cubie_face (cubenum, faces)
 	VALUES
 		(10, 'WRG') --, (11, 'GWR'), (12, 'RGW')
 	,	(20, 'WGO')
@@ -68,16 +68,16 @@ BEGIN
 	,	(80, 'YOG')
 	;
 	-- ...with clockwise rotation
-	INSERT INTO cubeface (cubenum, faces)
+	INSERT INTO cubie_face (cubenum, faces)
 	SELECT cubenum + 1, SUBSTRING(faces, 3, 1) + SUBSTRING(faces, 1, 1) + SUBSTRING(faces, 2, 1)
-	FROM cubeface where cubenum % 10 = 0;
+	FROM cubie_face where cubenum % 10 = 0;
 	-- ...with anti-clockwise rotation
-	INSERT INTO cubeface (cubenum, faces)
+	INSERT INTO cubie_face (cubenum, faces)
 	SELECT cubenum + 2, SUBSTRING(faces, 2, 1) + SUBSTRING(faces, 3, 1) + SUBSTRING(faces, 1, 1)
-	FROM cubeface where cubenum % 10 = 0;
+	FROM cubie_face where cubenum % 10 = 0;
 END;
 GO
--- DROP TABLE cubeface;
+-- DROP TABLE cubie_face;
 
 -- Table for which face stickers are visible in specific locations, for any cubie
 -- This also corresponds to output order
@@ -91,14 +91,14 @@ GO
 --       19 20
 --       21 22
 --       23 24
-IF	OBJECT_ID('stickerface') IS NULL
+IF	OBJECT_ID('sticker_face') IS NULL
 BEGIN
-	CREATE TABLE dbo.stickerface (
+	CREATE TABLE dbo.sticker_face (
 		stickerpos TINYINT NOT NULL -- 1 through 24, corresponding to 24 sticker faces
 	,	cubepos    TINYINT NOT NULL -- cube positions 1 through 8
 	,	facepos    TINYINT NOT NULL -- which of the three cubie faces, 0, 1, or 2
 	)
-	INSERT INTO stickerface (stickerpos, cubepos, facepos)
+	INSERT INTO sticker_face (stickerpos, cubepos, facepos)
 	VALUES
 	-- Top face stickers
 		(01, 1, 0) -- top, left-rear
@@ -131,10 +131,10 @@ BEGIN
 	,	(23, 1, 2) -- rear, upper-left
 	,	(24, 2, 1) -- rear, upper-left
 	;
-	CREATE UNIQUE CLUSTERED INDEX PK_stickerface ON stickerface (stickerpos);
+	CREATE UNIQUE CLUSTERED INDEX PK_sticker_face ON sticker_face (stickerpos);
 END;
 GO
--- DROP TABLE stickerface;
+-- DROP TABLE sticker_face;
 
 IF	OBJECT_ID('print_cube') IS NULL
 BEGIN
@@ -211,21 +211,21 @@ BEGIN
 			SET	@line = '|';
 		END;
 		SELECT
-			@line += ' ' + ISNULL(SUBSTRING(cubeface.faces, stickerface.facepos + 1, 1), '?') + ' |'
+			@line += ' ' + ISNULL(SUBSTRING(cubie_face.faces, sticker_face.facepos + 1, 1), '?') + ' |'
 		FROM
 			@c AS c
-			-- cubeface knows what the sticker colours are
+			-- cubie_face knows what the sticker colours are
 			-- on cubenum, which is cube plus orientation
-			INNER JOIN cubeface
-			ON	c.cubenum = cubeface.cubenum
-			-- stickerface chooses which of the three cube faces
+			INNER JOIN cubie_face
+			ON	c.cubenum = cubie_face.cubenum
+			-- sticker_face chooses which of the three cube faces
 			-- is visible on each sticker location
-			INNER JOIN stickerface
-			ON	stickerface.cubepos = c.cubepos
+			INNER JOIN sticker_face
+			ON	sticker_face.cubepos = c.cubepos
 		WHERE
-			stickerface.stickerpos BETWEEN @minstickerpos AND @maxstickerpos
+			sticker_face.stickerpos BETWEEN @minstickerpos AND @maxstickerpos
 		ORDER BY
-			stickerface.stickerpos
+			sticker_face.stickerpos
 		;
 		PRINT @line;
 	  END;
@@ -369,25 +369,25 @@ GO
 -- DROP function dbo.transform_cube;
 
 -- Table to hold all possible pocket cube transformations
-IF	OBJECT_ID('cubetransformation') IS NULL
+IF	OBJECT_ID('cube_state') IS NULL
 BEGIN
-	CREATE TABLE dbo.cubetransformation (
+	CREATE TABLE dbo.cube_state (
 		id          INT     NOT NULL IDENTITY(1, 1) PRIMARY KEY CLUSTERED
 	,	cube_layout BIGINT  NOT NULL -- cube position encoded as decimal value
 	,	step_count  INT     NOT NULL -- number of steps away from a complete solution
 	,	solve_id    INT     NULL -- ref to self pointing toward solution
 	,	solvemove   CHAR(2) NULL -- move to make toward solution
 	);
-	CREATE UNIQUE INDEX UX_cubetransformation_cube_layout ON dbo.cubetransformation (cube_layout);
-	CREATE        INDEX X_cubetransformation_solve_id     ON dbo.cubetransformation (solve_id);
+	CREATE UNIQUE INDEX UX_cube_state_cube_layout ON dbo.cube_state (cube_layout);
+	CREATE        INDEX X_cube_state_solve_id     ON dbo.cube_state (solve_id);
 END;
 GO
--- DROP TABLE dbo.cubetransformation;
+-- DROP TABLE dbo.cube_state;
 
 -- Static table for solve moves and their inverses
-IF	OBJECT_ID('cubetransformationmove') IS NULL
+IF	OBJECT_ID('cube_move') IS NULL
 BEGIN
-	CREATE TABLE dbo.cubetransformationmove (
+	CREATE TABLE dbo.cube_move (
 		id                 INT     NOT NULL IDENTITY(1, 1) -- For sorting
 	,	transformationmove CHAR(2) NOT NULL PRIMARY KEY
 	,	inversemove        CHAR(2) NOT NULL
@@ -396,7 +396,7 @@ END;
 IF	NOT EXISTS (
 		SELECT *
 		FROM
-			dbo.cubetransformationmove
+			dbo.cube_move
 	)
 BEGIN
 	WITH mini_turn (id, mini_turn) AS (
@@ -415,7 +415,7 @@ BEGIN
 		UNION ALL SELECT 2, '-', '+'
 		UNION ALL SELECT 3, '=', '='
 	)
-	INSERT INTO cubetransformationmove (transformationmove, inversemove)
+	INSERT INTO cube_move (transformationmove, inversemove)
 	SELECT
 		mini_turn.mini_turn + mini_move.mini_move         AS transformationmove
 	,	mini_turn.mini_turn + mini_move.inverse_mini_move AS inversemove
@@ -428,44 +428,44 @@ BEGIN
 	;
 END;
 GO
--- DROP TABLE dbo.cubetransformationmove;
+-- DROP TABLE dbo.cube_move;
+
+-- Seed very first row
+IF	NOT EXISTS (
+		SELECT *
+		FROM
+			dbo.cube_state
+		WHERE
+			dbo.cube_state.cube_layout = 1020304050607080
+	)
+BEGIN
+	INSERT INTO dbo.cube_state (cube_layout, step_count, solve_id, solvemove)
+	VALUES (1020304050607080, 0, NULL, NULL);
+END;
+GO
 
 -- Set up counter
-IF	OBJECT_ID('cubetransformationcounter') IS NULL
+IF	OBJECT_ID('cube_state_counter') IS NULL
 BEGIN
-	CREATE TABLE dbo.cubetransformationcounter (
+	CREATE TABLE dbo.cube_state_counter (
 		last_id INT NULL
 	);
 END;
 IF	NOT EXISTS (
 	SELECT *
 	FROM
-		dbo.cubetransformationcounter
+		dbo.cube_state_counter
 	)
 BEGIN
-	INSERT INTO dbo.cubetransformationcounter (last_id)
+	INSERT INTO dbo.cube_state_counter (last_id)
 	SELECT
-		MAX(cubetransformation.id) - 1
+		MAX(cube_state.id) - 1
 	FROM
-		cubetransformation
+		cube_state
 	;
 END;
 GO
--- DROP TABLE dbo.cubetransformationcounter
-
--- Seed very first row
-IF	NOT EXISTS (
-		SELECT *
-		FROM
-			dbo.cubetransformation
-		WHERE
-			dbo.cubetransformation.cube_layout = 1020304050607080
-	)
-BEGIN
-	INSERT INTO dbo.cubetransformation (cube_layout, step_count, solve_id, solvemove)
-	VALUES (1020304050607080, 0, NULL, NULL);
-END;
-GO
+-- DROP TABLE dbo.cube_state_counter
 
 -- Step through
 DECLARE
@@ -482,36 +482,46 @@ BEGIN
 	SET	@i += 1;
 	PRINT '# Iteration @i = ' + ISNULL(RTRIM(@i), 'NULL');
 	SELECT
-		@id = dbo.cubetransformationcounter.last_id
+		@id = dbo.cube_state_counter.last_id
 	FROM
-		dbo.cubetransformationcounter
+		dbo.cube_state_counter
 	;
 	SET	@c          = NULL;
 	SET	@step_count = NULL;
 	SELECT TOP 1
-		@id         = dbo.cubetransformation.id
-	,	@c          = dbo.cubetransformation.cube_layout
-	,	@step_count = dbo.cubetransformation.step_count
+		@id         = dbo.cube_state.id
+	,	@c          = dbo.cube_state.cube_layout
+	,	@step_count = dbo.cube_state.step_count
 	FROM
-		dbo.cubetransformation
+		dbo.cube_state
 	WHERE
-		dbo.cubetransformation.id > @id
+		dbo.cube_state.id > @id
 	ORDER BY
-		dbo.cubetransformation.id
+		dbo.cube_state.id
 	;
 	PRINT '# Processing @id = ' + ISNULL(RTRIM(@id), 'NULL') + ', @c = ' + ISNULL(RTRIM(@c), 'NULL') + ', @step_count = ' + ISNULL(RTRIM(@step_count), 'NULL');
 	IF	@c IS NOT NULL
 	BEGIN
 		WITH transformations (id, cube_layout, transformationmove, inversemove) AS (
 			SELECT
-				dbo.cubetransformationmove.id
-			,	dbo.transform_cube(@c, dbo.cubetransformationmove.transformationmove)
-			,	dbo.cubetransformationmove.transformationmove
-			,	dbo.cubetransformationmove.inversemove
+				dbo.cube_move.id
+			,	dbo.transform_cube(@c, dbo.cube_move.transformationmove)
+			,	dbo.cube_move.transformationmove
+			,	dbo.cube_move.inversemove
 			FROM
-				dbo.cubetransformationmove
+				dbo.cube_move
+			-- NOTE: I have decided to reduce the number of possible cube states
+			-- by locking the very first cube while allowing remaining seven to move
+			-- This means that certain moves that alter the first cube
+			-- are no longer permitted
+			-- The first cube is upper-left-rear, so U, L, B moves not permitted
+			-- Also, entire cube rotations x, y, z are not permitted
+			WHERE
+				dbo.cube_move.transformationmove IN (
+					'D+', 'D-', 'D=', 'R+', 'R-', 'R=', 'F+', 'F-', 'F='
+				)
 		)
-		INSERT INTO dbo.cubetransformation (
+		INSERT INTO dbo.cube_state (
 			cube_layout
 		,	solve_id
 		,	solvemove
@@ -530,7 +540,7 @@ BEGIN
 			NOT EXISTS (
 					SELECT *
 					FROM
-						dbo.cubetransformation AS other_transformations
+						dbo.cube_state AS other_transformations
 					WHERE
 						other_transformations.cube_layout = transformations.cube_layout
 			)
@@ -538,17 +548,22 @@ BEGIN
 			transformations.id
 		;
 		UPDATE
-		dbo.cubetransformationcounter
+			dbo.cube_state_counter
 		SET
-			dbo.cubetransformationcounter.last_id = @id
+			dbo.cube_state_counter.last_id = @id
 		FROM
-			dbo.cubetransformationcounter
+			dbo.cube_state_counter
 		;
+	END;
+	ELSE
+	BEGIN
+		BREAK;
 	END;
 END;
 GO
--- SELECT * FROM dbo.cubetransformationcounter;
--- SELECT * FROM dbo.cubetransformation;
+-- SELECT * FROM dbo.cube_state_counter;
+-- SELECT * FROM dbo.cube_state;
+-- TRUNCATE TABLE dbo.cube_state;
 
 /*
 EXEC print_cube @cube_layout = 1020304050607080;
