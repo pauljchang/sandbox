@@ -566,6 +566,43 @@ GO
 -- TRUNCATE TABLE dbo.cube_state;
 
 /*
+-- Solve a cube that requires 11 transformations
+DECLARE
+	@initial_cube_layout BIGINT = 1080527041322061
+;
+WITH solve_steps (cube_layout, step_count, solve_id, solvemove) AS (
+	-- "Seed" query for the recursive query
+	SELECT
+		dbo.cube_state.cube_layout
+	,	dbo.cube_state.step_count
+	,	dbo.cube_state.solve_id
+	,	dbo.cube_state.solvemove
+	FROM
+		dbo.cube_state
+	WHERE
+		dbo.cube_state.cube_layout = @initial_cube_layout
+	-- Recursive portion
+	UNION ALL
+	SELECT
+		dbo.cube_state.cube_layout
+	,	dbo.cube_state.step_count
+	,	dbo.cube_state.solve_id
+	,	dbo.cube_state.solvemove
+	FROM
+		dbo.cube_state
+		INNER JOIN solve_steps
+		ON	dbo.cube_state.id = solve_steps.solve_id
+)
+SELECT *
+FROM
+	solve_steps
+ORDER BY
+	solve_steps.step_count DESC
+;
+*/
+
+/*
+-- Unit tests based on solved cube transformations
 EXEC print_cube @cube_layout = 1020304050607080;
 DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U+'); EXEC print_cube @cube_layout = @foo;
 DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U-'); EXEC print_cube @cube_layout = @foo;
