@@ -320,10 +320,10 @@ BEGIN
 		stickerpos  TINYINT     NOT NULL -- 1 through 24
 	,	cubepos     TINYINT     NULL -- 1 through 8
 	,	cubenum     TINYINT     NULL -- 10 through 82
-	,	face        CHAR(1)     NULL -- which of six colours
+	,	colour      CHAR(1)     NULL -- which of six colours
 	,	x           INT         NULL -- center of sticker
 	,	y           INT         NULL -- center of sticker
-	,	f           CHAR(1)     NULL -- which face: U, D, L, R, F, B
+	,	face        CHAR(1)     NULL -- which face: U, D, L, R, F, B
 	,	polygon     VARCHAR(50) NULL -- SVG polygon points
 	,	fill        CHAR(7)     NULL -- SVG polygon fill RGB #FFFFFF
 	,	thickness   INT         NULL -- SVG polygon thickness
@@ -331,7 +331,7 @@ BEGIN
 	INSERT INTO @s (stickerpos, x, y, face)
 	VALUES
 		( 1, 12,  8, 'U'), ( 2, 16,  6, 'U'), ( 3, 16, 10, 'U'), ( 4, 20,  8, 'U')
-	,	( 5, 10, 11, 'L'), ( 6, 14, 13, 'L'), (11, 10, 15, 'L'), (12, 24, 17, 'L')
+	,	( 5, 10, 11, 'L'), ( 6, 14, 13, 'L'), (11, 10, 15, 'L'), (12, 14, 17, 'L')
 	,	( 7, 18, 13, 'F'), ( 8, 22, 11, 'F'), ( 7, 18, 17, 'F'), ( 8, 22, 15, 'F')
 	,	( 9, 30,  5, 'R'), (10, 26,  3, 'R'), (15, 30,  9, 'R'), (16, 26,  7, 'R')
 	,	(17, 16, 26, 'D'), (18, 20, 24, 'D'), (19, 12, 24, 'D'), (20, 16, 22, 'D')
@@ -344,25 +344,25 @@ BEGIN
 	SET
 		s.cubepos = sticker_face.cubepos
 	,	s.cubenum = c.cubenum
-	,	s.face    = SUBSTRING(c.faces, sticker_face.facepos + 1, 1)
+	,	s.colour  = SUBSTRING(c.faces, sticker_face.facepos + 1, 1)
 	,	s.polygon =
 		CASE
 			-- Up and Down stickers are 8 wide and 4 high
-			WHEN s.f IN ('U', 'D')
+			WHEN s.face IN ('U', 'D')
 			THEN
 				RTRIM(@face_size * (x + 0)) + ',' + RTRIM(@face_size * (y - 2)) + ' ' +
 				RTRIM(@face_size * (x + 4)) + ',' + RTRIM(@face_size * (y + 0)) + ' ' +
 				RTRIM(@face_size * (x + 0)) + ',' + RTRIM(@face_size * (y + 2)) + ' ' +
 				RTRIM(@face_size * (x - 4)) + ',' + RTRIM(@face_size * (y + 0)) + ' '
 			-- Left and Right stickers are 4 wide and 6 high, tilted left
-			WHEN s.f IN ('L', 'R')
+			WHEN s.face IN ('L', 'R')
 			THEN
 				RTRIM(@face_size * (x - 2)) + ',' + RTRIM(@face_size * (y - 3)) + ' ' +
 				RTRIM(@face_size * (x + 2)) + ',' + RTRIM(@face_size * (y - 1)) + ' ' +
 				RTRIM(@face_size * (x + 2)) + ',' + RTRIM(@face_size * (y + 3)) + ' ' +
 				RTRIM(@face_size * (x - 2)) + ',' + RTRIM(@face_size * (y + 1)) + ' '
 			-- Front and Back stickers are 4 wide and 6 high, tilted right
-			WHEN s.f IN ('F', 'B')
+			WHEN s.face IN ('F', 'B')
 			THEN
 				RTRIM(@face_size * (x + 2)) + ',' + RTRIM(@face_size * (y - 3)) + ' ' +
 				RTRIM(@face_size * (x + 2)) + ',' + RTRIM(@face_size * (y + 1)) + ' ' +
@@ -406,7 +406,7 @@ BEGIN
 <svg width=' + ISNULL('"' + RTRIM(@svg_width) + '"', 'NULL') + ' height=' + ISNULL('"' + RTRIM(@svg_height) + '"', 'NULL')+ '>'
 	UNION ALL
 	SELECT '
-<!-- cube layout ' + ISNULL(@cube_layout, 'NULL') + ', move ' + ISNULL(@move, 'NULL') + ' -->'
+<!-- cube layout ' + ISNULL(RTRIM(@cube_layout), 'NULL') + ', move ' + ISNULL(@move, 'NULL') + ' -->'
 	;
 	
 	INSERT INTO @svgfrag (frag)
@@ -415,6 +415,7 @@ BEGIN
 		'stickerpos ' + ISNULL(RTRIM(s.stickerpos), 'NULL') + ', ' +
 		'cubepos '    + ISNULL(RTRIM(s.cubepos),    'NULL') + ', ' +
 		'cubenum '    + ISNULL(RTRIM(s.cubenum),    'NULL') + ', ' +
+		'colour '     + ISNULL(s.colour,            'NULL') + ', ' +
 		'face '       + ISNULL(s.face,              'NULL') + ', ' +
 		'x '          + ISNULL(RTRIM(s.x),          'NULL') + ', ' +
 		'y '          + ISNULL(RTRIM(s.y),          'NULL') + ' -->
@@ -446,6 +447,7 @@ Sorry, your browser does not support inline SVG. Try getting a newer, better bro
 	SET	@out_svg = CAST(@svgstr AS XML);
 END;
 GO
+-- EXEC print_cube_svg @cube_layout = 1020304050607080;
 -- DROP PROCEDURE print_cube_svg;
 
 IF	OBJECT_ID('transform_cube') IS NULL
@@ -818,7 +820,6 @@ ORDER BY
 /*
 -- Unit tests based on solved cube transformations
 EXEC print_cube @cube_layout = 1020304050607080;
-EXEC print_cube_svg @cube_layout = 1020304050607080;
 DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U+'); EXEC print_cube @cube_layout = @foo;
 DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U-'); EXEC print_cube @cube_layout = @foo;
 DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U='); EXEC print_cube @cube_layout = @foo;
