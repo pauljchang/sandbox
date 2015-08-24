@@ -337,7 +337,6 @@ BEGIN
 	,	(17, 16, 26, 'D'), (18, 20, 24, 'D'), (19, 12, 24, 'D'), (20, 16, 22, 'D')
 	,	(21,  2,  9, 'B'), (22,  6,  7, 'B'), (23,  2,  5, 'B'), (24,  6,  3, 'B')
 	;
-
 	-- Update sticker positions with SVG polygons
 	UPDATE
 		s
@@ -418,6 +417,8 @@ BEGIN
 	;
 	
 	INSERT INTO @svgfrag (frag)
+/*
+-- No need for all this verbosity
 	SELECT '
 <!-- cubie ' +
 		'stickerpos ' + ISNULL(RTRIM(s.stickerpos), 'NULL') + ', ' +
@@ -426,7 +427,10 @@ BEGIN
 		'colour '     + ISNULL(s.colour,            'NULL') + ', ' +
 		'face '       + ISNULL(s.face,              'NULL') + ', ' +
 		'x '          + ISNULL(RTRIM(s.x),          'NULL') + ', ' +
-		'y '          + ISNULL(RTRIM(s.y),          'NULL') + ' -->
+		'y '          + ISNULL(RTRIM(s.y),          'NULL') + ' -->'
+	UNION ALL
+*/
+	SELECT '
     <polygon
 	    points=' + ISNULL('"' + RTRIM(s.polygon) + '"', 'NULL') + '
 	    style="fill:' + ISNULL(s.fill, 'NULL') + ';stroke:black;stroke-width:' + ISNULL(RTRIM(s.thickness), '0') + '" />'
@@ -435,7 +439,18 @@ BEGIN
 	ORDER BY
 		s.stickerpos
 	;
-
+	
+	-- Stickers labeled with cubenum
+	-- Stickers are on the center, offset to the left by 1
+	INSERT INTO @svgfrag (frag)
+	SELECT '
+<text x="' + RTRIM((s.x - 1) * @face_size) + '" y="' + RTRIM(s.y * @face_size) + '" fill="black">' + RTRIM(s.cubenum) + '</text>'
+	FROM
+		@s AS s
+	ORDER BY
+		s.stickerpos
+	;
+	
 	-- Stop printing
 	INSERT INTO @svgfrag (frag)
 	VALUES ('
