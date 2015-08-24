@@ -142,6 +142,16 @@ BEGIN
 END;
 GO
 
+-- Print cube layout as text
+-- 
+--       01 02
+--       03 04
+-- 05 06 07 08 09 10
+-- 11 12 13 14 15 16
+--       17 18
+--       19 20
+--       21 22
+--       23 24
 ALTER PROCEDURE dbo.print_cube (@cube_layout BIGINT)
 AS
 BEGIN
@@ -233,6 +243,210 @@ BEGIN
 END;
 GO
 -- DROP PROCEDURE print_cube;
+
+IF	OBJECT_ID('print_cube_svg') IS NULL
+BEGIN
+	EXEC('CREATE PROCEDURE dbo.print_cube_svg AS SELECT 0;');
+END;
+GO
+
+-- Generate SVG based on cube layout
+--
+--       01 02
+--       03 04
+-- 05 06 07 08 09 10
+-- 11 12 13 14 15 16
+--       17 18
+--       19 20
+--       21 22
+--       23 24
+ALTER PROCEDURE dbo.print_cube_svg (
+	@cube_layout BIGINT
+,	@move        CHAR(2) = NULL -- optional, will highlight cubes to be moved
+,	@out_svg     XML     = NULL OUTPUT
+)
+AS
+BEGIN
+	-- For printing
+	DECLARE
+		-- For iterating
+		@i             TINYINT
+	,	@maxi          TINYINT
+	,	@minstickerpos TINYINT
+	,	@maxstickerpos TINYINT
+		-- SVG constants
+	,	@face_size     INT =  10 -- each face is 8x wide and 4x tall
+	,	@svg_width     INT = 320 -- 32 * @face_size
+	,	@svg_height    INT = 280 -- 28 * @face_size
+	,	@thick_line    INT =   3 -- how many pixels for thick lines
+		-- SVG output
+	,	@svgstr        VARCHAR(MAX) = NULL -- will be converted to XML for SVG output
+	;
+
+	DECLARE @svgfrag TABLE (
+		id   INT          NOT NULL IDENTITY(1, 1) PRIMARY KEY
+	,	frag VARCHAR(MAX) NULL
+	);
+	
+	-- Deduce individual cubes
+	DECLARE @c TABLE (
+		cubepos TINYINT     NOT NULL PRIMARY KEY CLUSTERED -- 1 through 8
+	,	cubenum TINYINT     NOT NULL -- 10 through 83
+	,	faces   CHAR(3)     NULL
+	);
+	INSERT INTO @c (cubepos, cubenum)
+	          SELECT 1, (@cube_layout / 100000000000000) % 100
+	UNION ALL SELECT 2, (@cube_layout /   1000000000000) % 100
+	UNION ALL SELECT 3, (@cube_layout /     10000000000) % 100
+	UNION ALL SELECT 4, (@cube_layout /       100000000) % 100
+	UNION ALL SELECT 5, (@cube_layout /         1000000) % 100
+	UNION ALL SELECT 6, (@cube_layout /           10000) % 100
+	UNION ALL SELECT 7, (@cube_layout /             100) % 100
+	UNION ALL SELECT 8, (@cube_layout                  ) % 100
+	;
+	UPDATE
+		c
+	SET
+		c.faces = cubie_face.faces
+	FROM
+		@c AS c
+		-- cubie_face knows what the sticker colours are
+		-- on cubenum, which is cube plus orientation
+		INNER JOIN cubie_face
+		ON	c.cubenum = cubie_face.cubenum
+	
+	-- Individual stickers
+	DECLARE @s TABLE (
+		stickerpos  TINYINT     NOT NULL -- 1 through 24
+	,	cubepos     TINYINT     NULL -- 1 through 8
+	,	cubenum     TINYINT     NULL -- 10 through 82
+	,	face        CHAR(1)     NULL -- which of six colours
+	,	x           INT         NULL -- center of sticker
+	,	y           INT         NULL -- center of sticker
+	,	f           CHAR(1)     NULL -- which face: U, D, L, R, F, B
+	,	polygon     VARCHAR(50) NULL -- SVG polygon points
+	,	fill        CHAR(7)     NULL -- SVG polygon fill RGB #FFFFFF
+	,	thickness   INT         NULL -- SVG polygon thickness
+	);
+	INSERT INTO @s (stickerpos, x, y, face)
+	VALUES
+		( 1, 12,  8, 'U'), ( 2, 16,  6, 'U'), ( 3, 16, 10, 'U'), ( 4, 20,  8, 'U')
+	,	( 5, 10, 11, 'L'), ( 6, 14, 13, 'L'), (11, 10, 15, 'L'), (12, 24, 17, 'L')
+	,	( 7, 18, 13, 'F'), ( 8, 22, 11, 'F'), ( 7, 18, 17, 'F'), ( 8, 22, 15, 'F')
+	,	( 9, 30,  5, 'R'), (10, 26,  3, 'R'), (15, 30,  9, 'R'), (16, 26,  7, 'R')
+	,	(17, 16, 26, 'D'), (18, 20, 24, 'D'), (19, 12, 24, 'D'), (20, 16, 22, 'D')
+	,	(21,  2,  9, 'B'), (22,  6,  7, 'B'), (23,  2,  5, 'B'), (24,  6,  3, 'B')
+	;
+
+	-- Update sticker positions with SVG polygons
+	UPDATE
+		s
+	SET
+		s.cubepos = sticker_face.cubepos
+	,	s.cubenum = c.cubenum
+	,	s.face    = SUBSTRING(c.faces, sticker_face.facepos + 1, 1)
+	,	s.polygon =
+		CASE
+			-- Up and Down stickers are 8 wide and 4 high
+			WHEN s.f IN ('U', 'D')
+			THEN
+				RTRIM(@face_size * (x + 0)) + ',' + RTRIM(@face_size * (y - 2)) + ' ' +
+				RTRIM(@face_size * (x + 4)) + ',' + RTRIM(@face_size * (y + 0)) + ' ' +
+				RTRIM(@face_size * (x + 0)) + ',' + RTRIM(@face_size * (y + 2)) + ' ' +
+				RTRIM(@face_size * (x - 4)) + ',' + RTRIM(@face_size * (y + 0)) + ' '
+			-- Left and Right stickers are 4 wide and 6 high, tilted left
+			WHEN s.f IN ('L', 'R')
+			THEN
+				RTRIM(@face_size * (x - 2)) + ',' + RTRIM(@face_size * (y - 3)) + ' ' +
+				RTRIM(@face_size * (x + 2)) + ',' + RTRIM(@face_size * (y - 1)) + ' ' +
+				RTRIM(@face_size * (x + 2)) + ',' + RTRIM(@face_size * (y + 3)) + ' ' +
+				RTRIM(@face_size * (x - 2)) + ',' + RTRIM(@face_size * (y + 1)) + ' '
+			-- Front and Back stickers are 4 wide and 6 high, tilted right
+			WHEN s.f IN ('F', 'B')
+			THEN
+				RTRIM(@face_size * (x + 2)) + ',' + RTRIM(@face_size * (y - 3)) + ' ' +
+				RTRIM(@face_size * (x + 2)) + ',' + RTRIM(@face_size * (y + 1)) + ' ' +
+				RTRIM(@face_size * (x - 2)) + ',' + RTRIM(@face_size * (y + 3)) + ' ' +
+				RTRIM(@face_size * (x - 2)) + ',' + RTRIM(@face_size * (y - 1)) + ' '
+			ELSE ''
+		END
+	,	s.fill =
+		CASE
+			WHEN SUBSTRING(c.faces, sticker_face.facepos + 1, 1) = 'R' THEN '#FF0000' -- Red
+			WHEN SUBSTRING(c.faces, sticker_face.facepos + 1, 1) = 'G' THEN '#00FF00' -- Green
+			WHEN SUBSTRING(c.faces, sticker_face.facepos + 1, 1) = 'B' THEN '#0000FF' -- Blue
+			WHEN SUBSTRING(c.faces, sticker_face.facepos + 1, 1) = 'W' THEN '#FFFFFF' -- White
+			WHEN SUBSTRING(c.faces, sticker_face.facepos + 1, 1) = 'Y' THEN '#FFFF00' -- Yellow
+			WHEN SUBSTRING(c.faces, sticker_face.facepos + 1, 1) = 'O' THEN '#FF7F00' -- Orange
+			ELSE '#000000'
+		END
+	,	s.thickness =
+		CASE
+			WHEN
+				(@move LIKE 'F%' AND s.stickerpos IN ( 3,  4,  6,  9, 12, 15, 17, 18))
+			OR  (@move LIKE 'B%' AND s.stickerpos IN ( 1,  2,  5, 10, 11, 16, 19, 20))
+			OR  (@move LIKE 'L%' AND s.stickerpos IN ( 1,  3,  7, 13, 17, 19, 21, 23))
+			OR  (@move LIKE 'R%' AND s.stickerpos IN ( 2,  4,  8, 14, 18, 20, 22, 24))
+			OR  (@move LIKE 'U%' AND s.stickerpos IN ( 5,  6,  7,  8,  9, 10, 23, 24))
+			OR  (@move LIKE 'D%' AND s.stickerpos IN (11, 12, 13, 14, 15, 16, 21, 22))
+			THEN @thick_line
+			ELSE 1 -- default thickness
+		END
+	FROM
+		@s AS s
+		INNER JOIN sticker_face
+		ON	sticker_face.stickerpos = s.stickerpos
+		INNER JOIN @c AS c
+		ON	sticker_face.cubepos = c.cubepos
+	;
+
+	-- Start printing
+	INSERT INTO @svgfrag (frag)
+	SELECT '
+<svg width=' + ISNULL('"' + RTRIM(@svg_width) + '"', 'NULL') + ' height=' + ISNULL('"' + RTRIM(@svg_height) + '"', 'NULL')+ '>'
+	UNION ALL
+	SELECT '
+<!-- cube layout ' + ISNULL(@cube_layout, 'NULL') + ', move ' + ISNULL(@move, 'NULL') + ' -->'
+	;
+	
+	INSERT INTO @svgfrag (frag)
+	SELECT '
+<!-- cubie ' +
+		'stickerpos ' + ISNULL(RTRIM(s.stickerpos), 'NULL') + ', ' +
+		'cubepos '    + ISNULL(RTRIM(s.cubepos),    'NULL') + ', ' +
+		'cubenum '    + ISNULL(RTRIM(s.cubenum),    'NULL') + ', ' +
+		'face '       + ISNULL(s.face,              'NULL') + ', ' +
+		'x '          + ISNULL(RTRIM(s.x),          'NULL') + ', ' +
+		'y '          + ISNULL(RTRIM(s.y),          'NULL') + ' -->
+    <polygon
+	    points=' + ISNULL('"' + RTRIM(s.polygon) + '"', 'NULL') + '
+	    style="fill:' + ISNULL(s.fill, 'NULL') + ';stroke:black;stroke-width:' + ISNULL(RTRIM(s.thickness), '0') + '" />'
+	FROM
+		@s AS s
+	ORDER BY
+		s.stickerpos
+	;
+
+	-- Stop printing
+	INSERT INTO @svgfrag (frag)
+	VALUES ('
+Sorry, your browser does not support inline SVG. Try getting a newer, better browser.
+</svg>');
+
+	-- Concatenate and output
+	SET	@svgstr = '';
+	SELECT
+		@svgstr += svgfrag.frag
+	FROM
+		@svgfrag AS svgfrag
+	ORDER BY
+		svgfrag.id
+	;
+	SELECT @svgstr AS 'SVG';
+	SET	@out_svg = CAST(@svgstr AS XML);
+END;
+GO
+-- DROP PROCEDURE print_cube_svg;
 
 IF	OBJECT_ID('transform_cube') IS NULL
 BEGIN
@@ -604,6 +818,7 @@ ORDER BY
 /*
 -- Unit tests based on solved cube transformations
 EXEC print_cube @cube_layout = 1020304050607080;
+EXEC print_cube_svg @cube_layout = 1020304050607080;
 DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U+'); EXEC print_cube @cube_layout = @foo;
 DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U-'); EXEC print_cube @cube_layout = @foo;
 DECLARE @foo BIGINT = dbo.transform_cube(1020304050607080, 'U='); EXEC print_cube @cube_layout = @foo;
