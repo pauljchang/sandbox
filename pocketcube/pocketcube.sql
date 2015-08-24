@@ -406,7 +406,15 @@ BEGIN
 <svg width=' + ISNULL('"' + RTRIM(@svg_width) + '"', 'NULL') + ' height=' + ISNULL('"' + RTRIM(@svg_height) + '"', 'NULL')+ '>'
 	UNION ALL
 	SELECT '
-<!-- cube layout ' + ISNULL(RTRIM(@cube_layout), 'NULL') + ', move ' + ISNULL(@move, 'NULL') + ' -->'
+<!-- cube layout ' + ISNULL(RTRIM(@cube_layout), 'NULL') + ', move "' + ISNULL(@move, '') + '" -->
+<text x="' + RTRIM(@face_size * 10) + '" y="' + RTRIM(@face_size * 2) + '" fill="black">' + ISNULL(RTRIM(@cube_layout), 'NULL') + '</text>
+<text x="' + RTRIM(@face_size * 10) + '" y="' + RTRIM(@face_size * 4) + '" fill="black">' + ISNULL(@move, '') + '</text>
+<text x="' + RTRIM(@face_size * 20) + '" y="' + RTRIM(@face_size * 5) + '" fill="black">Up</text>
+<text x="' + RTRIM(@face_size * 9) + '" y="' + RTRIM(@face_size * 19) + '" fill="black" transform="rotate(25 ' + RTRIM(@face_size * 9) + ',' + RTRIM(@face_size * 19) + ')">Left</text>
+<text x="' + RTRIM(@face_size * 20) + '" y="' + RTRIM(@face_size * 20) + '" fill="black" transform="rotate(-25 ' + RTRIM(@face_size * 20) + ',' + RTRIM(@face_size * 20) + ')">Front</text>
+<text x="' + RTRIM(@face_size * 3) + '" y="' + RTRIM(@face_size * 13) + '" fill="black" transform="rotate(-25 ' + RTRIM(@face_size * 3) + ',' + RTRIM(@face_size * 13) + ')">Back</text>
+<text x="' + RTRIM(@face_size * 26) + '" y="' + RTRIM(@face_size * 12) + '" fill="black" transform="rotate(25 ' + RTRIM(@face_size * 26) + ',' + RTRIM(@face_size * 12) + ')">Right</text>
+<text x="' + RTRIM(@face_size * 20) + '" y="' + RTRIM(@face_size * 28) + '" fill="black">Down</text>'
 	;
 	
 	INSERT INTO @svgfrag (frag)
@@ -447,7 +455,7 @@ Sorry, your browser does not support inline SVG. Try getting a newer, better bro
 	SET	@out_svg = CAST(@svgstr AS XML);
 END;
 GO
--- EXEC print_cube_svg @cube_layout = 1020304050607080;
+-- EXEC print_cube_svg @cube_layout = 1020304050607080, @move='F+';
 -- DROP PROCEDURE print_cube_svg;
 
 IF	OBJECT_ID('transform_cube') IS NULL
