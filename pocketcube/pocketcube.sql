@@ -332,7 +332,7 @@ BEGIN
 	VALUES
 		( 1, 12,  8, 'U'), ( 2, 16,  6, 'U'), ( 3, 16, 10, 'U'), ( 4, 20,  8, 'U')
 	,	( 5, 10, 11, 'L'), ( 6, 14, 13, 'L'), (11, 10, 15, 'L'), (12, 14, 17, 'L')
-	,	( 7, 18, 13, 'F'), ( 8, 22, 11, 'F'), ( 7, 18, 17, 'F'), ( 8, 22, 15, 'F')
+	,	( 7, 18, 13, 'F'), ( 8, 22, 11, 'F'), (13, 18, 17, 'F'), (14, 22, 15, 'F')
 	,	( 9, 30,  5, 'R'), (10, 26,  3, 'R'), (15, 30,  9, 'R'), (16, 26,  7, 'R')
 	,	(17, 16, 26, 'D'), (18, 20, 24, 'D'), (19, 12, 24, 'D'), (20, 16, 22, 'D')
 	,	(21,  2,  9, 'B'), (22,  6,  7, 'B'), (23,  2,  5, 'B'), (24,  6,  3, 'B')
@@ -417,8 +417,6 @@ BEGIN
 	;
 	
 	INSERT INTO @svgfrag (frag)
-/*
--- No need for all this verbosity
 	SELECT '
 <!-- cubie ' +
 		'stickerpos ' + ISNULL(RTRIM(s.stickerpos), 'NULL') + ', ' +
@@ -427,10 +425,7 @@ BEGIN
 		'colour '     + ISNULL(s.colour,            'NULL') + ', ' +
 		'face '       + ISNULL(s.face,              'NULL') + ', ' +
 		'x '          + ISNULL(RTRIM(s.x),          'NULL') + ', ' +
-		'y '          + ISNULL(RTRIM(s.y),          'NULL') + ' -->'
-	UNION ALL
-*/
-	SELECT '
+		'y '          + ISNULL(RTRIM(s.y),          'NULL') + ' -->
     <polygon
 	    points=' + ISNULL('"' + RTRIM(s.polygon) + '"', 'NULL') + '
 	    style="fill:' + ISNULL(s.fill, 'NULL') + ';stroke:black;stroke-width:' + ISNULL(RTRIM(s.thickness), '0') + '" />'
@@ -879,4 +874,20 @@ DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(d
 DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'x='), 'x+'), 'x-'), 'x='); EXEC print_cube @cube_layout = @foo;
 DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'y='), 'y+'), 'y-'), 'y='); EXEC print_cube @cube_layout = @foo;
 DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(1020304050607080, 'z='), 'z+'), 'z-'), 'z='); EXEC print_cube @cube_layout = @foo;
+*/
+
+/*
+-- Cube examples
+-- Solved state
+DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020304050607080, @out_svg = @svg OUTPUT; SELECT @svg;
+-- Each of 9 transformations from that state
+DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020304070508060, @out_svg = @svg OUTPUT; SELECT @svg;
+DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020304060805070, @out_svg = @svg OUTPUT; SELECT @svg;
+DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020304080706050, @out_svg = @svg OUTPUT; SELECT @svg;
+DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020523161427080, @out_svg = @svg OUTPUT; SELECT @svg;
+DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020426131527080, @out_svg = @svg OUTPUT; SELECT @svg;
+DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020605040307080, @out_svg = @svg OUTPUT; SELECT @svg;
+DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1041306250817022, @out_svg = @svg OUTPUT; SELECT @svg;
+DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1081302250417062, @out_svg = @svg OUTPUT; SELECT @svg;
+DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1060308050207040, @out_svg = @svg OUTPUT; SELECT @svg;
 */
