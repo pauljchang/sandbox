@@ -133,15 +133,15 @@ GROUP BY
 	sols.c8
 )
 SELECT
-	qr.r AS c
-,	c1_count.c1_count
-,	c2_count.c2_count
-,	c3_count.c3_count
-,	c4_count.c4_count
-,	c5_count.c5_count
-,	c6_count.c6_count
-,	c7_count.c7_count
-,	c8_count.c8_count
+	qr.r AS r
+,	c1_count.c1_count AS c1
+,	c2_count.c2_count AS c2
+,	c3_count.c3_count AS c3
+,	c4_count.c4_count AS c4
+,	c5_count.c5_count AS c5
+,	c6_count.c6_count AS c6
+,	c7_count.c7_count AS c7
+,	c8_count.c8_count AS c8
 FROM
 	qr
 	LEFT JOIN c1_count ON c1_count.c1 = qr.r
