@@ -804,10 +804,11 @@ GO
 DECLARE
 	@initial_cube_layout BIGINT = 1080527041322061
 ;
-WITH solve_steps (cube_layout, step_count, solve_id, solvemove) AS (
+WITH solve_steps (id, cube_layout, step_count, solve_id, solvemove) AS (
 	-- "Seed" query for the recursive query
 	SELECT
-		dbo.cube_state.cube_layout
+		dbo.cube_state.id
+	,	dbo.cube_state.cube_layout
 	,	dbo.cube_state.step_count
 	,	dbo.cube_state.solve_id
 	,	dbo.cube_state.solvemove
@@ -818,7 +819,8 @@ WITH solve_steps (cube_layout, step_count, solve_id, solvemove) AS (
 	-- Recursive portion
 	UNION ALL
 	SELECT
-		dbo.cube_state.cube_layout
+		dbo.cube_state.id
+	,	dbo.cube_state.cube_layout
 	,	dbo.cube_state.step_count
 	,	dbo.cube_state.solve_id
 	,	dbo.cube_state.solvemove
@@ -879,15 +881,36 @@ DECLARE @foo BIGINT = dbo.transform_cube(dbo.transform_cube(dbo.transform_cube(d
 /*
 -- Cube examples
 -- Solved state
-DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020304050607080, @out_svg = @svg OUTPUT; SELECT @svg;
+EXEC print_cube_svg @cube_layout = 1020304050607080;
 -- Each of 9 transformations from that state
-DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020304070508060, @out_svg = @svg OUTPUT; SELECT @svg;
-DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020304060805070, @out_svg = @svg OUTPUT; SELECT @svg;
-DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020304080706050, @out_svg = @svg OUTPUT; SELECT @svg;
-DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020523161427080, @out_svg = @svg OUTPUT; SELECT @svg;
-DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020426131527080, @out_svg = @svg OUTPUT; SELECT @svg;
-DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1020605040307080, @out_svg = @svg OUTPUT; SELECT @svg;
-DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1041306250817022, @out_svg = @svg OUTPUT; SELECT @svg;
-DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1081302250417062, @out_svg = @svg OUTPUT; SELECT @svg;
-DECLARE @svg XML; EXEC print_cube_svg @cube_layout = 1060308050207040, @out_svg = @svg OUTPUT; SELECT @svg;
+EXEC print_cube_svg @cube_layout = 1020304070508060;
+EXEC print_cube_svg @cube_layout = 1020304060805070;
+EXEC print_cube_svg @cube_layout = 1020304080706050;
+EXEC print_cube_svg @cube_layout = 1020523161427080;
+EXEC print_cube_svg @cube_layout = 1020426131527080;
+EXEC print_cube_svg @cube_layout = 1020605040307080;
+EXEC print_cube_svg @cube_layout = 1041306250817022;
+EXEC print_cube_svg @cube_layout = 1081302250417062;
+EXEC print_cube_svg @cube_layout = 1060308050207040;
+-- Cube solve example
+EXEC print_cube_svg @cube_layout = 1080527041322061, @move = 'F=';
+EXEC print_cube_svg @cube_layout = 1080324170522061, @move = 'R=';
+EXEC print_cube_svg @cube_layout = 1052326170802041, @move = 'D-';
+EXEC print_cube_svg @cube_layout = 1052326180417020, @move = 'F+';
+EXEC print_cube_svg @cube_layout = 1052823042607020, @move = 'D-';
+EXEC print_cube_svg @cube_layout = 1052823060204270, @move = 'R=';
+EXEC print_cube_svg @cube_layout = 1020827060524230, @move = 'D-';
+EXEC print_cube_svg @cube_layout = 1020827052306042, @move = 'F-';
+EXEC print_cube_svg @cube_layout = 1020723180516042, @move = 'D-';
+EXEC print_cube_svg @cube_layout = 1020723151428060, @move = 'F-';
+EXEC print_cube_svg @cube_layout = 1020304070508060, @move = 'D-';
+EXEC print_cube_svg @cube_layout = 1020304050607080;
+/*
+-- Distribution of depth
+-- Best charted on a logarithmic axis
+SELECT step_count, COUNT(*)
+FROM cube_state
+GROUP BY step_count
+ORDER BY step_count
+;
 */
