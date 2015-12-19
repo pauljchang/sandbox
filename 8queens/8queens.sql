@@ -65,4 +65,14 @@ AND ABS(qr5.c - qr8.c) <> ABS(qr5.r - qr8.r)
 AND ABS(qr6.c - qr7.c) <> ABS(qr6.r - qr7.r)
 AND ABS(qr6.c - qr8.c) <> ABS(qr6.r - qr8.r)
 AND ABS(qr7.c - qr8.c) <> ABS(qr7.r - qr8.r)
+-- Ordering
+ORDER BY
+	qr1.r
+,	qr2.r
+,	qr3.r
+,	qr4.r
+,	qr5.r
+,	qr6.r
+,	qr7.r
+,	qr8.r
 ;
