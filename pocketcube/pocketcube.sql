@@ -468,9 +468,9 @@ GO
 -- EXEC print_cube_svg @cube_layout = 1020304050607080, @move='F+';
 -- DROP PROCEDURE print_cube_svg;
 
-IF	OBJECT_ID('transform_cube') IS NULL
+IF	OBJECT_ID('transform_cube') IS NOT NULL
 BEGIN
-	EXEC('CREATE FUNCTION dbo.transform_cube () RETURNS BIGINT AS BEGIN RETURN 0; END;');
+	EXEC('DROP FUNCTION dbo.transform_cube;');
 END;
 GO
 
@@ -485,8 +485,9 @@ GO
 --   x', x3, or x- -- rotate entire cube along x-axis, anti-clockwise from right
 --   x2 or x= -- rotate entire cube along x-axis, 180 degrees
 --   ...same for y-axis (rotate from top) and z-axis (rotate from front)
-ALTER FUNCTION dbo.transform_cube (@cube_layout BIGINT, @move CHAR(2))
-	RETURNS BIGINT
+CREATE FUNCTION dbo.transform_cube (@cube_layout BIGINT, @move CHAR(2))
+RETURNS BIGINT
+WITH SCHEMABINDING
 AS
 BEGIN
 	DECLARE
@@ -905,6 +906,8 @@ EXEC print_cube_svg @cube_layout = 1020723180516042, @move = 'D-';
 EXEC print_cube_svg @cube_layout = 1020723151428060, @move = 'F-';
 EXEC print_cube_svg @cube_layout = 1020304070508060, @move = 'D-';
 EXEC print_cube_svg @cube_layout = 1020304050607080;
+*/
+
 /*
 -- Distribution of depth
 -- Best charted on a logarithmic axis
